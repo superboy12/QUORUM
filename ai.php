@@ -1,4 +1,5 @@
 <?php
+
 function get_ai_reply($prompt) {
     $api_key = "AIzaSyBt_8eub0TAUQPzRGSrCqkPZ-IOq-w4dMc"; // Ganti dengan API key kamu
     $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$api_key";
@@ -31,6 +32,9 @@ function get_ai_reply($prompt) {
     $text = $result['candidates'][0]['content']['parts'][0]['text'] ?? "Tidak ada respon dari AI.";
     return $text;
 }
+
+
+
 
 // Opsional: handle POST request jika ingin akses via AJAX juga
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_GET['ajax'])) {
