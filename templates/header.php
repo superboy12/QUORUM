@@ -71,6 +71,7 @@ $xp_percentage = $user_xp > 0 ? ($xp_current_level / 1000) * 100 : 0;
 ?>
 <!DOCTYPE html>
 <html lang="id" class="">
+    
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -84,78 +85,8 @@ $xp_percentage = $user_xp > 0 ? ($xp_current_level / 1000) * 100 : 0;
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white font-sans transition-colors duration-300">
 
-<div id="menuOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden"></div>
-<aside id="sideMenu" class="fixed top-0 left-0 h-full w-64 bg-white dark:bg-[#1e1e1e] border-r border-gray-200 dark:border-gray-700 z-50 transform -translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
-    <div class="p-4 border-b border-gray-200 dark:border-gray-700">
-        <div class="flex justify-between items-center">
-            <div class="text-red-600 font-bold text-xl">Qurio Menu</div>
-            <button id="closeMenuBtn" class="text-gray-500 dark:text-gray-400 hover:text-red-500"><i class="fas fa-times"></i></button>
-        </div>
-    </div>
-    
-    <nav class="p-4 flex-grow overflow-y-auto">
-        <div class="pb-4 border-b border-gray-200 dark:border-gray-700">
-            <a href="profile.php?id=<?php echo htmlspecialchars($user_id); ?>" class="flex flex-col items-center text-center group">
-                <img src="<?php echo htmlspecialchars($user_avatar); ?>" alt="Avatar" class="w-20 h-20 rounded-full object-cover border-4 border-gray-300 dark:border-gray-600 group-hover:border-red-500 transition">
-                <p class="font-bold text-lg mt-3 text-gray-900 dark:text-white"><?php echo htmlspecialchars($username); ?></p>
-            </a>
-            <div class="mt-4">
-                <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">XP Progress</p>
-                <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5"><div class="bg-yellow-400 h-2.5 rounded-full" style="width: <?php echo $xp_percentage; ?>%"></div></div>
-                <p class="text-xs text-right text-yellow-500 dark:text-yellow-400 mt-1"><?php echo number_format($user_xp); ?> XP</p>
-            </div>
-            <div class="flex justify-around mt-4 text-center">
-                <div><p class="font-bold text-lg text-gray-900 dark:text-white"><?php echo $post_count; ?></p><p class="text-xs text-gray-500 dark:text-gray-400">Postingan</p></div>
-                <div><p class="font-bold text-lg text-gray-900 dark:text-white"><?php echo $follower_count; ?></p><p class="text-xs text-gray-500 dark:text-gray-400">Followers</p></div>
-                <div><p class="font-bold text-lg text-gray-900 dark:text-white"><?php echo $following_count; ?></p><p class="text-xs text-gray-500 dark:text-gray-400">Following</p></div>
-            </div>
-        </div>
-        
-        <ul class="space-y-2 mt-4">
-            <li><a href="index.php" class="flex items-center gap-4 p-2 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition"><i class="fas fa-home w-5 text-center"></i><span>Beranda</span></a></li>
-            <li><a href="profile.php?id=<?php echo htmlspecialchars($user_id); ?>" class="flex items-center gap-4 p-2 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition"><i class="fas fa-user w-5 text-center"></i><span>Profil Saya</span></a></li>
-        </ul>
-        
-        <div class="mt-6">
-            <h3 class="px-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Komunitas Saya</h3>
-            <ul class="mt-2 space-y-1">
-                <?php if (empty($joined_communities)): ?>
-                    <li class="px-2 py-1 text-sm text-gray-500">Anda belum bergabung.</li>
-                <?php else: ?>
-                    <?php foreach($joined_communities as $community): ?>
-                    <li>
-                        <a href="community.php?id=<?= $community['id'] ?>" class="flex items-center gap-3 p-2 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition">
-                            <img src="<?= htmlspecialchars($community['avatar_url']) ?>" class="w-6 h-6 rounded-md object-cover flex-shrink-0">
-                            <span class="text-sm truncate"><?= htmlspecialchars($community['name']) ?></span>
-                        </a>
-                    </li>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-                <li>
-                    <a href="create_community.php" class="flex items-center gap-4 p-2 text-sm text-red-500 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 transition">
-                        <i class="fas fa-plus-circle w-5 text-center"></i>
-                        <span>Buat Komunitas</span>
-                    </a>
-                </li>
-                 <li>
-                    <a href="communities.php" class="flex items-center gap-4 p-2 text-sm text-blue-500 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 transition">
-                        <i class="fas fa-compass w-5 text-center"></i>
-                        <span>Jelajahi Komunitas</span>
-                    </a>
-                </li>
-            </ul>
-        </div>
-    </nav>
-    
-    <div class="p-2 border-t border-gray-200 dark:border-gray-700">
-        <a href="settings.php" class="flex items-center gap-4 p-2 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition"><i class="fas fa-cog w-5 text-center"></i><span>Pengaturan</span></a>
-        <a href="logout.php" class="flex items-center gap-4 p-2 mt-1 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition"><i class="fas fa-sign-out-alt w-5 text-center"></i><span>Logout</span></a>
-    </div>
-</aside>
-
 <header id="main-header" class="bg-white dark:bg-[#1e1e1e] px-4 py-3 flex items-center justify-between border-b border-gray-200 dark:border-gray-700 fixed top-0 w-full z-30">
     <div class="flex items-center gap-4">
-        <button id="menuBtn" class="text-gray-600 dark:text-white text-xl"><i class="fas fa-bars"></i></button>
         <div class="text-red-600 font-bold text-xl">Qurio</div>
     </div>
     <div class="flex items-center gap-4">
@@ -168,16 +99,6 @@ $xp_percentage = $user_xp > 0 ? ($xp_current_level / 1000) * 100 : 0;
             <?php endif; ?>
         </a>
         <button id="openPostModal" class="bg-red-600 hover:bg-red-700 text-sm px-3 py-1 rounded text-white font-semibold"><i class="fas fa-plus"></i> Buat Post</button>
-        <div class="relative">
-          <button id="userBtn" class="flex items-center gap-2 text-gray-800 dark:text-white text-sm hover:opacity-80 transition">
-            <img src="<?php echo htmlspecialchars($user_avatar); ?>" alt="Avatar" class="w-8 h-8 rounded-full object-cover border-2 border-gray-400 dark:border-gray-600">
-            <span class="font-medium hidden md:block"><?php echo htmlspecialchars($username); ?></span>
-          </button>
-          <div id="userDropdown" class="hidden absolute right-0 mt-3 w-60 bg-white dark:bg-[#2c2c2c] border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50">
-            <div class="p-4 border-b border-gray-200 dark:border-gray-600"><a href="profile.php?id=<?php echo htmlspecialchars($user_id); ?>" class="flex items-center gap-3"><img src="<?php echo htmlspecialchars($user_avatar); ?>" alt="Avatar" class="w-10 h-10 rounded-full object-cover"><p class="font-bold text-gray-900 dark:text-white"><?php echo htmlspecialchars($username); ?></p></a></div>
-            <div class="py-2"><a href="profile.php?id=<?php echo htmlspecialchars($user_id); ?>" class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition"><i class="fas fa-user-circle w-5 text-center"></i><span>Profil Saya</span></a><a href="logout.php" class="flex items-center gap-3 px-4 py-2 text-sm text-red-500 hover:bg-red-700 hover:text-white transition"><i class="fas fa-sign-out-alt w-5 text-center"></i><span>Logout</span></a></div>
-          </div>
-        </div>
     </div>
 </header>
 
@@ -203,13 +124,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const postModal = document.getElementById('postModal');
     const openPostBtn = document.getElementById('openPostModal');
     const closePostBtn = document.getElementById('closePostModal');
-    const userBtn = document.getElementById('userBtn');
-    const userDropdown = document.getElementById('userDropdown');
     const notifBtn = document.getElementById('notifBtn');
-    const menuBtn = document.getElementById('menuBtn');
-    const closeMenuBtn = document.getElementById('closeMenuBtn');
-    const sideMenu = document.getElementById('sideMenu');
-    const menuOverlay = document.getElementById('menuOverlay');
+    // Semua variabel dan event listener untuk sidebar telah dihapus
+    // const menuBtn = document.getElementById('menuBtn');
+    // const closeMenuBtn = document.getElementById('closeMenuBtn');
+    // const sideMenu = document.getElementById('sideMenu');
+    // const menuOverlay = document.getElementById('menuOverlay');
     const dropArea = document.getElementById('dropArea');
     const fileInput = document.getElementById('fileInput');
     const dropText = document.getElementById('dropText');
@@ -219,29 +139,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const header = document.getElementById('main-header');
     const mainContent = document.getElementById('main-content');
 
-    function closeAllDropdowns(except) {
-        if (except !== userDropdown && userDropdown) userDropdown.classList.add('hidden');
-    }
-
     openPostBtn?.addEventListener('click', () => postModal.classList.remove('hidden'));
     closePostBtn?.addEventListener('click', () => postModal.classList.add('hidden'));
 
-    userBtn?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        userDropdown.classList.toggle('hidden');
-    });
-
-    const openMenu = () => { menuOverlay?.classList.remove('hidden'); sideMenu?.classList.remove('-translate-x-full'); };
-    const closeMenu = () => { menuOverlay?.classList.add('hidden'); sideMenu?.classList.add('-translate-x-full'); };
-    menuBtn?.addEventListener('click', openMenu);
-    closeMenuBtn?.addEventListener('click', closeMenu);
-    menuOverlay?.addEventListener('click', closeMenu);
-
-    window.addEventListener('click', function(e){
-        if (!userBtn.contains(e.target) && !userDropdown.contains(e.target)){
-            userDropdown.classList.add('hidden');
-        }
-    });
+    // Semua fungsi dan event listener untuk sidebar telah dihapus
+    // const openMenu = () => { menuOverlay?.classList.remove('hidden'); sideMenu?.classList.remove('-translate-x-full'); };
+    // const closeMenu = () => { menuOverlay?.classList.add('hidden'); sideMenu?.classList.add('-translate-x-full'); };
+    // menuBtn?.addEventListener('click', openMenu);
+    // closeMenuBtn?.addEventListener('click', closeMenu);
+    // menuOverlay?.addEventListener('click', closeMenu);
 
     if (dropArea) {
         dropArea.addEventListener('click', () => fileInput.click());
