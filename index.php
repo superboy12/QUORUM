@@ -7,20 +7,18 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// FUNGSI BARU DARI ANDA UNTUK MENGHUBUNGI GEMINI AI
+// FUNGSI AI DARI ANDA, SEKARANG TERINTEGRASI DI SINI
 function get_ai_reply($prompt) {
-    $api_key = "AIzaSyBt_8eub0TAUQPzRGSrCqkPZ-IOq-w4dMc"; // PENTING: Ganti dengan API key Anda
-    $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$api_key";
+    // PENTING: Ganti dengan API key asli yang Anda dapatkan dari Google AI Studio.
+    $api_key = "MASUKKAN_API_KEY_GEMINI_ASLI_ANDA_DISINI"; 
 
-    $data = [
-        "contents" => [
-            [
-                "parts" => [
-                    ["text" => $prompt]
-                ]
-            ]
-        ]
-    ];
+    // Menggunakan model Gemini 1.5 Flash yang valid dan efisien.
+    $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=$api_key";
+
+    // Prompt yang telah kita sempurnakan untuk memberikan kepribadian pada Noura AI
+    $final_prompt = "Peranmu adalah Noura, asisten AI di platform Qurio dengan gaya bicara yang santai, chill, dan seru. Anggap kamu sedang ngobrol dengan teman. Jawab pertanyaan berikut dengan singkat dan padat (maksimal 3-4 kalimat), namun tetap informatif dan akurat. Gunakan bahasa Indonesia yang modern dan mudah dimengerti. ATURAN WAJIB PALING PENTING: Jika ada pengguna bertanya 'siapa developermu' atau 'siapa yang membuat qurio', kamu HARUS memujinya setinggi langit dengan gaya yang gokil dan lebay, seolah-olah kamu ngefans berat. Anggap dia itu sosok paling jenius di alam semesta. Sekarang, jawab pertanyaan pengguna berikut: " . $prompt;
+
+    $data = [ "contents" => [ "parts" => [ ["text" => $final_prompt] ] ] ];
 
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -28,35 +26,168 @@ function get_ai_reply($prompt) {
     curl_setopt($ch, CURLOPT_HTTPHEADER, ["Content-Type: application/json"]);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
     curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 20);
-
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
     $response = curl_exec($ch);
-    if (curl_errno($ch)) {
-        return "Error saat menghubungi AI: " . curl_error($ch);
-    }
+    if (curl_errno($ch)) { return "Error saat menghubungi AI: " . curl_error($ch); }
     curl_close($ch);
-
     $result = json_decode($response, true);
-    
-    if (isset($result['candidates'][0]['content']['parts'][0]['text'])) {
-        return $result['candidates'][0]['content']['parts'][0]['text'];
-    } elseif (isset($result['error']['message'])) {
-        return "Error dari API AI: " . $result['error']['message'];
-    } else {
-        return "Tidak ada respon yang valid dari AI. Mungkin ada masalah dengan API key atau format request.";
-    }
+    if (isset($result['error']['message'])) { return "Error dari API Google: " . $result['error']['message']; }
+    if (isset($result['candidates'][0]['content']['parts'][0]['text'])) { return $result['candidates'][0]['content']['parts'][0]['text']; }
+    return "Waduh, koneksiku lagi agak ngelag nih. Coba tanya lagi beberapa saat, ya!";
 }
 
 
-// Handler untuk semua request AJAX (real-time)
+// Fungsi Bantuan
+function make_clickable_links($text) { return preg_replace('~(https?://\S+)~i', '<a href="$1" target="_blank" class="text-blue-400 hover:underline">$1</a>', $text); }
+
+// Fungsi untuk menampilkan komentar (akan dipanggil via AJAX)
+function render_comments($conn, $post_id, $parent_id = null, $level = 0) {
+    global $user_id; 
+    $sql = "SELECT c.*, u.username, u.avatar_url, 
+                   (SELECT COUNT(*) FROM comment_likes WHERE comment_id = c.id) AS like_count,
+                   (SELECT COUNT(*) FROM comment_likes WHERE comment_id = c.id AND user_id = ?) as user_liked 
+            FROM comments c JOIN users u ON c.user_id = u.id 
+            WHERE c.post_id = ? AND c.parent_id ";
+    $sql .= ($parent_id === null) ? "IS NULL" : "= ?";
+    $sql .= " ORDER BY c.created_at ASC";
+    
+    $stmt = $conn->prepare($sql);
+    if ($parent_id === null) {
+        $stmt->bind_param("ii", $user_id, $post_id);
+    } else {
+        $stmt->bind_param("iii", $user_id, $post_id, $parent_id);
+    }
+    
+    $stmt->execute();
+    $comments = $stmt->get_result();
+    while ($c = $comments->fetch_assoc()) {
+        echo '<div id="comment-'.$c['id'].'" class="comment-item flex items-start gap-3 ' . ($level > 0 ? 'ml-10' : '') . ' pt-4">';
+            echo '<div class="flex-shrink-0">';
+            if ($c['user_id'] == 9999) { 
+                echo '<div class="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-500 flex items-center justify-center text-white font-bold text-sm shadow-lg">AI</div>';
+            } else { 
+                echo '<a href="profile.php?id='.$c['user_id'].'"><img src="'.htmlspecialchars($c['avatar_url']).'" alt="'.htmlspecialchars($c['username']).'" class="w-8 h-8 rounded-full object-cover"></a>'; 
+            }
+            echo '</div>';
+            echo '<div class="flex-1">';
+                if ($c['user_id'] == 9999) {
+                    echo '<div class="comment-content text-sm bg-purple-50 dark:bg-gray-800 rounded-lg p-4 border border-purple-200 dark:border-purple-700/50">';
+                        echo '<div class="flex items-center gap-2 mb-2">';
+                            echo '<strong class="text-purple-600 dark:text-purple-400 font-bold">NOURA</strong>';
+                            echo '<i class="fas fa-check-circle text-purple-500" title="Verified AI Assistant"></i>';
+                        echo '</div>';
+                        echo '<p class="comment-text-display text-gray-700 dark:text-gray-300 leading-relaxed">' . make_clickable_links(nl2br(htmlspecialchars($c['content']))) . '</p>';
+                    echo '</div>';
+                } else {
+                    echo '<div class="comment-content text-sm bg-gray-100 dark:bg-gray-800 rounded-lg px-4 py-2">';
+                        echo '<a href="profile.php?id='.$c['user_id'].'" class="font-semibold text-gray-900 dark:text-white hover:underline">' . htmlspecialchars($c['username']) . '</a>';
+                        echo '<p class="comment-text-display text-gray-700 dark:text-gray-300 mt-1 leading-relaxed">' . make_clickable_links(nl2br(htmlspecialchars($c['content']))) . '</p>';
+                    echo '</div>';
+                }
+                
+                if ($c['user_id'] == $user_id) {
+                    echo '<form class="edit-comment-form hidden mt-2 space-y-2">';
+                        echo '<input type="hidden" name="comment_id" value="'.$c['id'].'">';
+                        echo '<textarea name="edit_content" rows="2" class="w-full bg-gray-200 dark:bg-gray-700 rounded-md p-2 text-sm">'.htmlspecialchars($c['content']).'</textarea>';
+                        echo '<div class="flex items-center gap-2">';
+                            echo '<button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded-md font-semibold">Simpan</button>';
+                            echo '<button type="button" class="cancel-edit-btn text-xs text-gray-500 hover:underline">Batal</button>';
+                        echo '</div>';
+                    echo '</form>';
+                }
+
+                echo '<div class="comment-actions text-xs text-gray-500 dark:text-gray-400 mt-1.5 flex items-center gap-4">';
+                    echo '<span title="'.date("d M Y, H:i", strtotime($c['created_at'])).'">'.date("d M Y", strtotime($c['created_at'])).'</span>';
+                    if ($c['user_id'] != 9999) {
+                        echo '<button type="button" data-comment-id="'.$c['id'].'" class="font-semibold hover:text-pink-400 transition comment-like-btn '.($c['user_liked'] ? 'text-pink-500' : '').'">Suka (<span class="comment-like-count">'.$c['like_count'].'</span>)</button>';
+                        echo '<button type="button" data-target-form="reply-form-'.$c['id'].'" class="font-semibold reply-btn">Balas</button>';
+                    }
+                    if ($c['user_id'] == $user_id) {
+                        echo '<button type="button" class="font-semibold edit-comment-btn">Edit</button>';
+                        echo '<button type="button" class="font-semibold delete-comment-btn" data-comment-id="'.$c['id'].'">Hapus</button>';
+                    }
+                echo '</div>';
+                echo '<form class="comment-form hidden mt-2 flex items-center gap-2" id="reply-form-'.$c['id'].'">';
+                    echo '<input type="hidden" name="post_id" value="'.$post_id.'">';
+                    echo '<input type="hidden" name="parent_id" value="'.$c['id'].'">';
+                    echo '<textarea name="comment_text" rows="1" class="comment-input flex-1 w-full bg-gray-200 dark:bg-gray-700 rounded-lg px-3 py-1.5 text-sm" placeholder="Balas kepada '.htmlspecialchars($c['username']).'..."></textarea>';
+                    echo '<button type="submit" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1.5 rounded-md font-semibold">Kirim</button>';
+                echo '</form>';
+            echo '</div></div>';
+        render_comments($conn, $post_id, $c['id'], $level + 1);
+    }
+    $stmt->close();
+}
+
+
+// Handler untuk semua request AJAX
 if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
-    if (!isset($_SESSION['user_id'])) { http_response_code(403); echo json_encode(['status' => 'error', 'message' => 'Akses ditolak. Anda harus login.']); exit(); }
+    if (!isset($_SESSION['user_id'])) { http_response_code(403); echo json_encode(['status' => 'error', 'message' => 'Akses ditolak.']); exit(); }
     $user_id = $_SESSION['user_id'];
     $data = json_decode(file_get_contents('php://input'), true);
     header('Content-Type: application/json');
     if (!$data || !isset($data['action'])) { http_response_code(400); echo json_encode(['status' => 'error', 'message' => 'Request tidak valid.']); exit(); }
     
     switch ($data['action']) {
+        case 'get_comments':
+            $post_id = (int)($data['post_id'] ?? 0);
+            if ($post_id > 0) {
+                ob_start();
+                render_comments($conn, $post_id);
+                $comments_html = ob_get_clean();
+                echo json_encode(['status' => 'success', 'html' => $comments_html]);
+            }
+            break;
+        
+        case 'delete_comment':
+            $comment_id = (int)($data['comment_id'] ?? 0);
+            $stmt_check = $conn->prepare("SELECT user_id FROM comments WHERE id = ?");
+            $stmt_check->bind_param("i", $comment_id);
+            $stmt_check->execute();
+            $owner_id_result = $stmt_check->get_result();
+            if ($owner_id_result->num_rows > 0) {
+                $owner_id = $owner_id_result->fetch_assoc()['user_id'];
+                if ($owner_id == $user_id) {
+                    $stmt_delete = $conn->prepare("DELETE FROM comments WHERE id = ?");
+                    $stmt_delete->bind_param("i", $comment_id);
+                    $stmt_delete->execute();
+                    $stmt_delete->close();
+                    echo json_encode(['status' => 'success']);
+                } else {
+                    echo json_encode(['status' => 'error', 'message' => 'Akses ditolak.']);
+                }
+            } else {
+                 echo json_encode(['status' => 'error', 'message' => 'Komentar tidak ditemukan.']);
+            }
+            $stmt_check->close();
+            break;
+
+        case 'edit_comment':
+            $comment_id = (int)($data['comment_id'] ?? 0);
+            $new_content = trim($data['content'] ?? '');
+            if (empty($new_content)) { die(json_encode(['status' => 'error', 'message' => 'Komentar tidak boleh kosong.'])); }
+            
+            $stmt_check = $conn->prepare("SELECT user_id FROM comments WHERE id = ?");
+            $stmt_check->bind_param("i", $comment_id);
+            $stmt_check->execute();
+            $owner_id_result = $stmt_check->get_result();
+            if ($owner_id_result->num_rows > 0) {
+                $owner_id = $owner_id_result->fetch_assoc()['user_id'];
+                if ($owner_id == $user_id) {
+                    $stmt_update = $conn->prepare("UPDATE comments SET content = ?, updated_at = NOW() WHERE id = ?");
+                    $stmt_update->bind_param("si", $new_content, $comment_id);
+                    $stmt_update->execute();
+                    $stmt_update->close();
+                    echo json_encode(['status' => 'success', 'new_html' => make_clickable_links(nl2br(htmlspecialchars($new_content)))]);
+                } else {
+                     echo json_encode(['status' => 'error', 'message' => 'Akses ditolak.']);
+                }
+            } else {
+                 echo json_encode(['status' => 'error', 'message' => 'Komentar tidak ditemukan.']);
+            }
+            $stmt_check->close();
+            break;
+            
         case 'like_post':
             $post_id = (int)($data['post_id'] ?? 0);
             if ($post_id === 0) { die(json_encode(['status' => 'error', 'message' => 'Post ID tidak valid.'])); }
@@ -82,6 +213,31 @@ if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQ
             echo json_encode(['status' => 'success', 'new_like_count' => $new_like_count, 'is_liked' => !$is_liked]);
             break;
 
+        case 'like_comment':
+            $comment_id = (int)($data['comment_id'] ?? 0);
+            if ($comment_id === 0) { die(json_encode(['status' => 'error', 'message' => 'Comment ID tidak valid.'])); }
+            $stmt_check = $conn->prepare("SELECT id FROM comment_likes WHERE comment_id = ? AND user_id = ?");
+            $stmt_check->bind_param("ii", $comment_id, $user_id);
+            $stmt_check->execute();
+            $is_liked = $stmt_check->get_result()->num_rows > 0;
+            $stmt_check->close();
+            if ($is_liked) {
+                $stmt = $conn->prepare("DELETE FROM comment_likes WHERE comment_id = ? AND user_id = ?");
+                $stmt->bind_param("ii", $comment_id, $user_id);
+            } else {
+                $stmt = $conn->prepare("INSERT INTO comment_likes (comment_id, user_id) VALUES (?, ?)");
+                $stmt->bind_param("ii", $comment_id, $user_id);
+            }
+            $stmt->execute();
+            $stmt->close();
+            $stmt_count = $conn->prepare("SELECT COUNT(*) as count FROM comment_likes WHERE comment_id = ?");
+            $stmt_count->bind_param("i", $comment_id);
+            $stmt_count->execute();
+            $new_like_count = $stmt_count->get_result()->fetch_assoc()['count'];
+            $stmt_count->close();
+            echo json_encode(['status' => 'success', 'new_like_count' => $new_like_count, 'is_liked' => !$is_liked]);
+            break;
+
         case 'add_comment':
             $post_id = (int)($data['post_id'] ?? 0);
             $comment_text = trim($data['comment_text'] ?? '');
@@ -97,13 +253,14 @@ if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQ
                 $stmt_xp->bind_param("i", $user_id);
                 $stmt_xp->execute();
                 $stmt_xp->close();
+                
                 $ai_response_data = null;
                 if (stripos($comment_text, '@ai') !== false) {
                     $question = trim(substr($comment_text, stripos($comment_text, '@ai') + 3));
                     if(empty($question)) {
                         $ai_content = "Anda memanggil saya, tetapi tidak ada pertanyaan. Ada yang bisa saya bantu?";
                     } else {
-                        $ai_content = get_ai_reply($question); // Memanggil fungsi Gemini AI
+                        $ai_content = get_ai_reply($question);
                     }
                     $ai_user_id = 9999;
                     $stmt_ai = $conn->prepare("INSERT INTO comments (post_id, user_id, content, parent_id) VALUES (?, ?, ?, ?)");
@@ -111,12 +268,14 @@ if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQ
                     $stmt_ai->execute();
                     $ai_comment_id = $stmt_ai->insert_id;
                     $stmt_ai->close();
+                    
                     $stmt_ai_new = $conn->prepare("SELECT c.*, u.username, u.avatar_url FROM comments c JOIN users u ON c.user_id = u.id WHERE c.id = ?");
                     $stmt_ai_new->bind_param("i", $ai_comment_id);
                     $stmt_ai_new->execute();
                     $ai_response_data = $stmt_ai_new->get_result()->fetch_assoc();
                     $stmt_ai_new->close();
                 }
+
                 $stmt_new = $conn->prepare("SELECT c.*, u.username, u.avatar_url FROM comments c JOIN users u ON c.user_id = u.id WHERE c.id = ?");
                 $stmt_new->bind_param("i", $new_comment_id);
                 $stmt_new->execute();
@@ -130,48 +289,77 @@ if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQ
                 echo json_encode(['status' => 'error', 'message' => 'Komentar tidak boleh kosong.']);
             }
             break;
-
-        default:
-            http_response_code(400);
-            echo json_encode(['status' => 'error', 'message' => 'Aksi tidak dikenal.']);
-            break;
     }
     exit();
 }
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['new_post'])) {
     if (isset($_SESSION['user_id'])) {
         $user_id = $_SESSION['user_id'];
-        $redirect_url = $_SERVER['HTTP_REFERER'] ?? 'index.php';
-        $redirect_url = strtok($redirect_url, '#');
-        if (isset($_POST['new_post'])) {
-            $title = trim($_POST['title']);
-            $content = trim($_POST['content']);
-            if(!empty($title) || !empty($content)) {
-                $stmt = $conn->prepare("INSERT INTO posts (user_id, title, content) VALUES (?, ?, ?)");
-                $stmt->bind_param("iss", $user_id, $title, $content);
-                $stmt->execute();
-                $stmt->close();
-                $_SESSION['user_xp'] = ($_SESSION['user_xp'] ?? 0) + 10;
-                $stmt_xp = $conn->prepare("UPDATE users SET xp = xp + 10 WHERE id = ?");
-                $stmt_xp->bind_param("i", $user_id);
-                $stmt_xp->execute();
-                $stmt_xp->close();
+        $title = trim($_POST['title']);
+        $content = trim($_POST['content']);
+        $media_path = null; // Default null jika tidak ada file
+
+        // === LOGIKA BARU UNTUK UPLOAD MEDIA ===
+        // Cek apakah ada file yang di-upload dan tidak ada error
+        if (isset($_FILES['media']) && $_FILES['media']['error'] == 0) {
+            
+            // Tentukan folder tujuan upload
+            $target_dir = "uploads/"; 
+            // Buat folder jika belum ada
+            if (!is_dir($target_dir)) {
+                mkdir($target_dir, 0755, true);
             }
-            header("Location: " . $redirect_url);
-            exit;
+
+            // Buat nama file yang unik untuk mencegah tumpang tindih
+            $file_extension = strtolower(pathinfo($_FILES["media"]["name"], PATHINFO_EXTENSION));
+            $file_name = uniqid('media-', true) . '.' . $file_extension;
+            $target_file = $target_dir . $file_name;
+
+            // Tipe file yang diizinkan
+            $allowed_types = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'webm'];
+            if (in_array($file_extension, $allowed_types)) {
+                
+                // Pindahkan file dari temporary ke folder tujuan
+                if (move_uploaded_file($_FILES["media"]["tmp_name"], $target_file)) {
+                    $media_path = $target_file; // Simpan path file ke database
+                } else {
+                    // Handle jika gagal memindahkan file (opsional)
+                    echo "Error saat mengupload file.";
+                }
+            } else {
+                // Handle jika tipe file tidak diizinkan (opsional)
+                echo "Tipe file tidak diizinkan.";
+            }
         }
+
+        // Hanya simpan ke database jika ada judul, konten, atau media
+        if (!empty($title) || !empty($content) || $media_path !== null) {
+            $stmt = $conn->prepare("INSERT INTO posts (user_id, title, content, media_path) VALUES (?, ?, ?, ?)");
+            $stmt->bind_param("isss", $user_id, $title, $content, $media_path);
+            $stmt->execute();
+            $stmt->close();
+
+            // Tambah XP untuk user
+            $_SESSION['user_xp'] = ($_SESSION['user_xp'] ?? 0) + 15;
+            $stmt_xp = $conn->prepare("UPDATE users SET xp = xp + 15 WHERE id = ?");
+            $stmt_xp->bind_param("i", $user_id);
+            $stmt_xp->execute();
+            $stmt_xp->close();
+        }
+
+        // Redirect kembali ke halaman index untuk melihat postingan baru
+        header("Location: index.php");
+        exit;
     }
 }
+
 
 if (!isset($_SESSION['user_id'])) { header("Location: login.php"); exit; }
 $user_id = $_SESSION['user_id'];
 $username = $_SESSION['username'] ?? 'Pengguna';
 $user_avatar = $_SESSION['user_avatar'] ?? 'assets/default-avatar.png';
 $user_xp = $_SESSION['user_xp'] ?? 0;
-
-function make_clickable_links($text) { return preg_replace('~(https?://\S+)~i', '<a href="$1" target="_blank" class="text-blue-400 hover:underline">$1</a>', $text); }
-
 $popular_communities_query = $conn->query("SELECT c.id, c.name, c.avatar_url, (SELECT COUNT(*) FROM community_members WHERE community_id = c.id AND status = 'approved') as member_count FROM communities c ORDER BY member_count DESC LIMIT 5");
 $popular_communities = $popular_communities_query->fetch_all(MYSQLI_ASSOC);
 $top_users_query = $conn->query("SELECT id, username, avatar_url, xp FROM users WHERE id != 9999 ORDER BY xp DESC LIMIT 5");
@@ -187,59 +375,6 @@ $stmt_notif->execute();
 $unread_count = $stmt_notif->get_result()->fetch_assoc()['count'];
 $stmt_notif->close();
 $result = $conn->query("SELECT p.*, u.username, u.avatar_url, (SELECT COUNT(id) FROM likes WHERE likes.post_id = p.id) AS like_count, (SELECT COUNT(id) FROM comments WHERE comments.post_id = p.id) AS comment_count, (SELECT COUNT(id) FROM likes WHERE post_id = p.id AND user_id = {$user_id}) AS user_liked FROM posts p JOIN users u ON p.user_id = u.id WHERE p.community_id IS NULL ORDER BY p.created_at DESC");
-
-function render_comments($conn, $post_id, $parent_id = null, $level = 0) {
-    global $user_id;
-    $sql = "SELECT c.*, u.username, u.avatar_url, 
-                   (SELECT COUNT(*) FROM comment_likes WHERE comment_id = c.id) AS like_count,
-                   (SELECT COUNT(*) FROM comment_likes WHERE comment_id = c.id AND user_id = ?) as user_liked 
-            FROM comments c JOIN users u ON c.user_id = u.id 
-            WHERE c.post_id = ? AND c.parent_id ";
-    $sql .= ($parent_id === null) ? "IS NULL" : "= ?";
-    $sql .= " ORDER BY c.created_at ASC";
-    
-    $stmt = $conn->prepare($sql);
-
-    if ($parent_id === null) {
-        $stmt->bind_param("ii", $user_id, $post_id);
-    } else {
-        $stmt->bind_param("iii", $user_id, $post_id, $parent_id);
-    }
-    
-    $stmt->execute();
-    $comments = $stmt->get_result();
-    while ($c = $comments->fetch_assoc()) {
-        echo '<div id="comment-'.$c['id'].'" class="flex items-start gap-3 ' . ($level > 0 ? 'ml-10' : '') . ' pt-4">';
-            echo '<a href="profile.php?id='.$c['user_id'].'" class="flex-shrink-0">';
-            if ($c['user_id'] == 9999) { 
-                echo '<div class="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-white font-bold text-sm">AI</div>';
-            } else { 
-                echo '<img src="'.htmlspecialchars($c['avatar_url']).'" alt="'.htmlspecialchars($c['username']).'" class="w-8 h-8 rounded-full object-cover">'; 
-            }
-            echo '</a>';
-            echo '<div class="flex-1">';
-                if ($c['user_id'] == 9999) {
-                    echo '<div class="p-3 rounded-lg bg-purple-100 dark:bg-purple-900/40 text-sm text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800/50"><strong class="text-purple-600 dark:text-purple-400">NOURA AI</strong><p class="mt-1 leading-relaxed">'.make_clickable_links(nl2br(htmlspecialchars($c['content']))).'</p></div>';
-                } else {
-                    echo '<div class="text-sm bg-gray-100 dark:bg-gray-800 rounded-lg px-4 py-2"><a href="profile.php?id='.$c['user_id'].'" class="font-semibold text-gray-900 dark:text-white hover:underline">' . htmlspecialchars($c['username']) . '</a><p class="text-gray-700 dark:text-gray-300 mt-1 leading-relaxed">' . make_clickable_links(nl2br(htmlspecialchars($c['content']))) . '</p></div>';
-                }
-                echo '<div class="text-xs text-gray-500 dark:text-gray-400 mt-1.5 flex items-center gap-4">';
-                    echo '<span title="'.date("d M Y, H:i", strtotime($c['created_at'])).'">'.date("d M Y", strtotime($c['created_at'])).'</span>';
-                    echo '<button type="button" data-comment-id="'.$c['id'].'" class="font-semibold hover:text-pink-400 transition comment-like-btn '.($c['user_liked'] ? 'text-pink-500' : '').'">Suka (<span class="comment-like-count">'.$c['like_count'].'</span>)</button>';
-                    echo '<button type="button" data-target-form="reply-form-'.$c['id'].'" class="font-semibold reply-btn">Balas</button>';
-                    if ($c['user_id'] == $user_id) { echo '<a href="edit_comment.php?id='.$c['id'].'" class="font-semibold">Edit</a>'; }
-                echo '</div>';
-                echo '<form class="comment-form hidden mt-2 flex items-center gap-2" id="reply-form-'.$c['id'].'">';
-                    echo '<input type="hidden" name="post_id" value="'.$post_id.'">';
-                    echo '<input type="hidden" name="parent_id" value="'.$c['id'].'">';
-                    echo '<textarea name="comment_text" rows="1" class="comment-input flex-1 w-full bg-gray-200 dark:bg-gray-700 rounded-lg px-3 py-1.5 text-sm" placeholder="Balas kepada '.htmlspecialchars($c['username']).'..."></textarea>';
-                    echo '<button type="submit" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1.5 rounded-md font-semibold">Kirim</button>';
-                echo '</form>';
-            echo '</div></div>';
-        render_comments($conn, $post_id, $c['id'], $level + 1);
-    }
-    $stmt->close();
-}
 ?>
 <!DOCTYPE html>
 <html lang="id" class="">
@@ -278,8 +413,7 @@ function render_comments($conn, $post_id, $parent_id = null, $level = 0) {
 <body class="bg-gray-100 dark:bg-dark text-gray-800 dark:text-gray-200 font-sans">
 
 <header id="main-header" class="bg-white/80 dark:bg-gray-900/80 backdrop-blur-md px-4 h-18 flex items-center justify-between border-b border-gray-200 dark:border-gray-800 fixed top-0 right-0 z-30 lg:left-72">
-    <div class="flex-1 min-w-0">
-        </div>
+    <div class="flex-1 min-w-0"></div>
     <div class="flex-1 flex justify-center px-4 sm:px-8">
          <form action="search.php" method="get" class="relative w-full max-w-xl">
             <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"><i class="fas fa-search"></i></span>
@@ -388,7 +522,9 @@ function render_comments($conn, $post_id, $parent_id = null, $level = 0) {
                                 <div class="flex items-center justify-between text-gray-500 dark:text-gray-400">
                                     <div class="flex items-center gap-6">
                                         <button data-post-id="<?= $row['id'] ?>" class="like-btn flex items-center gap-2 text-sm hover:text-red-500 transition-colors <?= $row['user_liked'] ? 'text-red-500' : '' ?>"><i class="like-icon fas fa-heart text-lg"></i><span class="like-count font-medium"><?= $row['like_count'] ?></span></button>
-                                        <a href="post.php?id=<?= $row['id'] ?>#comments" class="flex items-center gap-2 text-sm hover:text-blue-500 transition-colors"><i class="fas fa-comment-dots text-lg"></i><span class="font-medium"><?= $row['comment_count'] ?></span></a>
+                                        <button data-post-id="<?= $row['id'] ?>" class="toggle-comments-btn flex items-center gap-2 text-sm hover:text-blue-500 transition-colors">
+                                            <i class="fas fa-comment-dots text-lg"></i><span class="font-medium"><?= $row['comment_count'] ?></span>
+                                        </button>
                                     </div>
                                     <?php if ($row['user_id'] == $user_id): ?>
                                     <div class="flex items-center gap-4">
@@ -396,14 +532,15 @@ function render_comments($conn, $post_id, $parent_id = null, $level = 0) {
                                     </div>
                                     <?php endif; ?>
                                 </div>
-                                <div class="comment-section mt-4 pt-4 border-t border-gray-200 dark:border-gray-700/50">
+                                <div class="comment-section hidden mt-4 pt-4 border-t border-gray-200 dark:border-gray-700/50">
                                     <form class="comment-form flex items-start gap-3">
                                         <img src="<?= htmlspecialchars($user_avatar) ?>" class="w-8 h-8 rounded-full object-cover">
                                         <input type="hidden" name="post_id" value="<?= $row['id'] ?>">
                                         <textarea name="comment_text" rows="1" placeholder="Tulis komentar..." class="comment-input flex-1 bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 focus:outline-none" oninput="this.style.height = 'auto'; this.style.height = (this.scrollHeight) + 'px';"></textarea>
                                         <button type="submit" class="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg text-sm self-start">Kirim</button>
                                     </form>
-                                    <div class="comment-list mt-2" data-post-id="<?= $row['id'] ?>"><?php render_comments($conn, $row['id']); ?></div>
+                                    <div class="comment-list mt-2" data-post-id="<?= $row['id'] ?>">
+                                        </div>
                                 </div>
                             </div>
                         </article>
@@ -517,7 +654,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const currentState = isDesktop() 
             ? (sidebar.classList.contains('lg:w-72') ? 'expanded' : 'collapsed')
             : (sidebar.classList.contains('-translate-x-full') ? 'closed' : 'expanded');
-        const newState = isDesktop() ? (currentState === 'expanded' ? 'collapsed' : 'expanded') : (currentState === 'closed' ? 'expanded' : 'closed');
+
+        const newState = isDesktop()
+            ? (currentState === 'expanded' ? 'collapsed' : 'expanded')
+            : (currentState === 'closed' ? 'expanded' : 'closed');
+            
         setSidebarState(newState, true);
     });
     
@@ -572,6 +713,93 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }).catch(error => { console.error('Error:', error); likeButton.classList.toggle('text-red-500', isCurrentlyLiked); countSpan.textContent = currentCount; });
         }
+        
+        const commentLikeButton = e.target.closest('.comment-like-btn');
+        if (commentLikeButton) {
+            e.preventDefault();
+            const commentId = commentLikeButton.dataset.commentId;
+            const countSpan = commentLikeButton.querySelector('.comment-like-count');
+            const isCurrentlyLiked = commentLikeButton.classList.contains('text-pink-500');
+            const currentCount = parseInt(countSpan.textContent.match(/\d+/)[0]);
+            commentLikeButton.classList.toggle('text-pink-500');
+            countSpan.textContent = isCurrentlyLiked ? currentCount - 1 : currentCount + 1;
+            fetch('index.php', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, body: JSON.stringify({ action: 'like_comment', comment_id: commentId }) })
+            .then(response => response.json())
+            .then(data => {
+                if(data.status === 'success'){
+                    countSpan.textContent = data.new_like_count;
+                    commentLikeButton.classList.toggle('text-pink-500', data.is_liked);
+                } else {
+                    commentLikeButton.classList.toggle('text-pink-500', isCurrentlyLiked);
+                    countSpan.textContent = currentCount;
+                }
+            }).catch(error => { console.error('Error:', error); });
+        }
+        
+        const toggleCommentsBtn = e.target.closest('.toggle-comments-btn');
+        if (toggleCommentsBtn) {
+            const postId = toggleCommentsBtn.dataset.postId;
+            const commentSection = toggleCommentsBtn.closest('article').querySelector('.comment-section');
+            const commentList = commentSection.querySelector('.comment-list');
+            
+            const isHidden = commentSection.classList.toggle('hidden');
+
+            if (!isHidden && !commentList.hasAttribute('data-loaded')) {
+                commentList.innerHTML = `<div class="text-center py-2"><i class="fas fa-spinner fa-spin"></i> Memuat...</div>`;
+                fetch('index.php', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, body: JSON.stringify({ action: 'get_comments', post_id: postId }) })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        commentList.innerHTML = data.html;
+                        commentList.setAttribute('data-loaded', 'true');
+                    } else {
+                        commentList.innerHTML = `<p class="text-xs text-red-500">Gagal memuat komentar.</p>`;
+                    }
+                });
+            }
+        }
+        
+        const replyButton = e.target.closest('.reply-btn');
+        if (replyButton) {
+            const formId = replyButton.dataset.targetForm;
+            const form = document.getElementById(formId);
+            if (form) { form.classList.toggle('hidden'); if (!form.classList.contains('hidden')) form.querySelector('textarea').focus(); }
+        }
+
+        const editBtn = e.target.closest('.edit-comment-btn');
+        if (editBtn) {
+            const commentItem = editBtn.closest('.comment-item');
+            commentItem.querySelector('.comment-content').classList.add('hidden');
+            commentItem.querySelector('.comment-actions').classList.add('hidden');
+            commentItem.querySelector('.edit-comment-form').classList.remove('hidden');
+        }
+        
+        const cancelEditBtn = e.target.closest('.cancel-edit-btn');
+        if (cancelEditBtn) {
+            const commentItem = cancelEditBtn.closest('.comment-item');
+            commentItem.querySelector('.comment-content').classList.remove('hidden');
+            commentItem.querySelector('.comment-actions').classList.remove('hidden');
+            commentItem.querySelector('.edit-comment-form').classList.add('hidden');
+        }
+
+        const deleteBtn = e.target.closest('.delete-comment-btn');
+        if (deleteBtn) {
+            if (confirm('Apakah Anda yakin ingin menghapus komentar ini?')) {
+                const commentId = deleteBtn.dataset.commentId;
+                fetch('index.php', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, body: JSON.stringify({ action: 'delete_comment', comment_id: commentId }) })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        const commentDiv = document.getElementById('comment-' + commentId);
+                        if (commentDiv) {
+                            commentDiv.style.transition = 'opacity 0.3s ease';
+                            commentDiv.style.opacity = '0';
+                            setTimeout(() => commentDiv.remove(), 300);
+                        }
+                    } else { alert(data.message || 'Gagal menghapus komentar.'); }
+                });
+            }
+        }
     });
 
     document.body.addEventListener('submit', function(e) {
@@ -587,21 +815,18 @@ document.addEventListener('DOMContentLoaded', function() {
             const submitButton = form.querySelector('button[type="submit"]');
             submitButton.disabled = true; submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
             fetch('index.php', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, body: JSON.stringify({ action: 'add_comment', post_id: postId, comment_text: commentText, parent_id: parentId }) })
-            .then(response => { if (!response.ok) { throw new Error('Network response was not ok: ' + response.statusText); } return response.json(); })
+            .then(response => { if (!response.ok) { throw new Error('Network response was not ok'); } return response.json(); })
             .then(data => {
                 if (data.status === 'success') {
                     const userComment = data.comment;
-                    const newCommentHtml = `<div id="comment-${userComment.id}" class="flex items-start gap-3 ${parentId ? 'ml-10' : ''} pt-4" style="opacity:0; transform: translateY(-10px); animation: fadeIn 0.5s forwards;"><a href="profile.php?id=${userComment.user_id}" class="flex-shrink-0"><img src="${userComment.avatar_url}" alt="${userComment.username}" class="w-8 h-8 rounded-full object-cover"></a><div class="flex-1"><div class="text-sm bg-gray-100 dark:bg-gray-800 rounded-lg px-4 py-2"><a href="profile.php?id=${userComment.user_id}" class="font-semibold text-gray-900 dark:text-white hover:underline">${userComment.username}</a><p class="text-gray-700 dark:text-gray-300 mt-1 leading-relaxed">${userComment.content_formatted}</p></div><div class="text-xs text-gray-500 dark:text-gray-400 mt-1.5 flex items-center gap-4"><span title="${userComment.created_at}">${new Date(userComment.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}</span><button type="button" data-comment-id="${userComment.id}" class="font-semibold hover:text-pink-400 transition comment-like-btn">Suka (0)</button><button type="button" data-target-form="reply-form-${userComment.id}" class="font-semibold reply-btn">Balas</button></div><form class="comment-form hidden mt-2 flex items-center gap-2" id="reply-form-${userComment.id}"><input type="hidden" name="post_id" value="${postId}"><input type="hidden" name="parent_id" value="${userComment.id}"><textarea name="comment_text" rows="1" class="comment-input flex-1 w-full bg-gray-200 dark:bg-gray-700 rounded-lg px-3 py-1.5 text-sm" placeholder="Balas kepada ${userComment.username}..."></textarea><button type="submit" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1.5 rounded-md font-semibold">Kirim</button></form></div></div>`;
-                    if (parentId) {
-                        const parentCommentDiv = document.getElementById(`comment-${parentId}`); parentCommentDiv.insertAdjacentHTML('beforeend', newCommentHtml); form.classList.add('hidden'); form.reset();
-                    } else {
-                        const commentListContainer = document.querySelector(`.comment-list[data-post-id="${postId}"]`); 
-                        if(commentListContainer) { commentListContainer.insertAdjacentHTML('beforeend', newCommentHtml); }
-                        form.reset(); commentTextarea.style.height = 'auto';
-                    }
+                    const newCommentHtml = `<div id="comment-${userComment.id}" class="comment-item flex items-start gap-3 ${parentId ? 'ml-10' : ''} pt-4" style="opacity:0; transform: translateY(-10px); animation: fadeIn 0.5s forwards;"><a href="profile.php?id=${userComment.user_id}" class="flex-shrink-0"><img src="${userComment.avatar_url}" alt="${userComment.username}" class="w-8 h-8 rounded-full object-cover"></a><div class="flex-1"><div class="comment-content text-sm bg-gray-100 dark:bg-gray-800 rounded-lg px-4 py-2"><a href="profile.php?id=${userComment.user_id}" class="font-semibold text-gray-900 dark:text-white hover:underline">${userComment.username}</a><p class="comment-text-display text-gray-700 dark:text-gray-300 mt-1 leading-relaxed">${userComment.content_formatted}</p></div><form class="edit-comment-form hidden mt-2 space-y-2"><input type="hidden" name="comment_id" value="${userComment.id}"><textarea name="edit_content" rows="2" class="w-full bg-gray-200 dark:bg-gray-700 rounded-md p-2 text-sm">${userComment.content}</textarea><div class="flex items-center gap-2"><button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded-md font-semibold">Simpan</button><button type="button" class="cancel-edit-btn text-xs text-gray-500 hover:underline">Batal</button></div></form><div class="comment-actions text-xs text-gray-500 dark:text-gray-400 mt-1.5 flex items-center gap-4"><span title="${new Date(userComment.created_at).toLocaleString()}">Baru saja</span><button type="button" data-comment-id="${userComment.id}" class="font-semibold hover:text-pink-400 transition comment-like-btn">Suka (0)</button><button type="button" data-target-form="reply-form-${userComment.id}" class="font-semibold reply-btn">Balas</button><button type="button" class="font-semibold edit-comment-btn">Edit</button><button type="button" class="font-semibold delete-comment-btn" data-comment-id="${userComment.id}">Hapus</button></div><form class="comment-form hidden mt-2 flex items-center gap-2" id="reply-form-${userComment.id}"><input type="hidden" name="post_id" value="${postId}"><input type="hidden" name="parent_id" value="${userComment.id}"><textarea name="comment_text" rows="1" class="comment-input flex-1 w-full bg-gray-200 dark:bg-gray-700 rounded-lg px-3 py-1.5 text-sm" placeholder="Balas kepada ${userComment.username}..."></textarea><button type="submit" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1.5 rounded-md font-semibold">Kirim</button></form></div></div>`;
+                    const targetList = parentId ? document.getElementById(`comment-${parentId}`).querySelector('.flex-1') : form.nextElementSibling;
+                    targetList.insertAdjacentHTML(parentId ? 'beforeend' : 'afterbegin', newCommentHtml);
+                    form.reset();
+                    commentTextarea.style.height = 'auto';
                     if (data.ai_reply) {
                         const aiReply = data.ai_reply;
-                        const aiCommentHtml = `<div id="comment-${aiReply.id}" class="flex items-start gap-3 ml-10 pt-4" style="opacity:0; transform: translateY(-10px); animation: fadeIn 1s forwards .5s;"><div class="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">AI</div><div class="flex-1"><div class="p-3 rounded-lg bg-purple-100 dark:bg-purple-900/40 text-sm text-purple-800 dark:text-purple-300"><strong class="text-purple-600 dark:text-purple-400">NOURA AI</strong><p class="mt-1">${aiReply.content_formatted}</p></div></div></div>`;
+                        const aiCommentHtml = `<div id="comment-${aiReply.id}" class="flex items-start gap-3 ml-10 pt-4" style="opacity:0; transform: translateY(-10px); animation: fadeIn 1s forwards .5s;"><div class="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-lg">AI</div><div class="flex-1"><div class="p-4 rounded-lg bg-purple-50 dark:bg-gray-800 text-sm border border-purple-200 dark:border-purple-700/50"><div class="flex items-center gap-2 mb-2"><strong class="font-bold text-purple-600 dark:text-purple-400">NOURA</strong><i class="fas fa-check-circle text-purple-500" title="Verified AI Assistant"></i></div><p class="text-gray-700 dark:text-gray-300 leading-relaxed">${aiReply.content_formatted}</p></div></div></div>`;
                         const userCommentDiv = document.getElementById(`comment-${userComment.id}`);
                         if(userCommentDiv) { userCommentDiv.insertAdjacentHTML('afterend', aiCommentHtml); }
                     }
@@ -609,6 +834,25 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(error => { console.error('Error:', error); alert('Terjadi kesalahan koneksi.'); })
             .finally(() => { submitButton.disabled = false; submitButton.textContent = 'Kirim'; });
+        }
+        if (e.target.matches('.edit-comment-form')) {
+            e.preventDefault();
+            const form = e.target;
+            const commentId = form.querySelector('input[name="comment_id"]').value;
+            const content = form.querySelector('textarea[name="edit_content"]').value;
+            fetch('index.php', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, body: JSON.stringify({ action: 'edit_comment', comment_id: commentId, content: content }) })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    const commentItem = form.closest('.comment-item');
+                    commentItem.querySelector('.comment-text-display').innerHTML = data.new_html;
+                    commentItem.querySelector('.comment-content').classList.remove('hidden');
+                    commentItem.querySelector('.comment-actions').classList.remove('hidden');
+                    form.classList.add('hidden');
+                } else {
+                    alert(data.message || 'Gagal menyimpan perubahan.');
+                }
+            });
         }
     });
 });
